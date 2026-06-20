@@ -27,16 +27,29 @@ Built for the **Nebius Buildathon**, powered entirely by [**Nebius Token Factory
 
 ## 🧠 What we use from Nebius Token Factory
 
-The app talks to Token Factory's **OpenAI-compatible Chat Completions endpoint** (`POST /v1/chat/completions`, Bearer-token auth). Specifically:
+> **Nebius Token Factory is the entire AI backbone of VitalLens** — there is no other ML service, no self-hosted model, and no other inference provider. Every piece of intelligence in the app is a call to Token Factory's OpenAI-compatible API serving open-weight models.
 
-- **Two hosted open-source models**
-  - **Vision** — `Qwen/Qwen2.5-VL-72B-Instruct` → reads report images & food photos
-  - **Reasoning** — `Qwen/Qwen3-235B-A22B-Instruct-2507` → writes the health plan & answers chat
-- **Vision / multimodal input** — images sent as `image_url` content parts (data URLs)
-- **JSON mode** — `response_format: { type: "json_object" }` for reliable structured output
-- **Standard generation params** — `temperature`, `max_tokens`, multi-turn message history
+### A multi-model, multimodal pipeline — not a single prompt
 
-Models and base URL are configurable at runtime in **⚙️ Settings** (alternatives include `Qwen3-Next-80B-Thinking`, `Llama-3.3-70B-Instruct`, `gpt-oss-120b`, `MiniCPM-V-4_5`).
+VitalLens deliberately uses **two specialized models on the same platform**, chosen for the job:
+
+| Role | Model (Token Factory) | Why this model |
+|------|----------------------|----------------|
+| 👁 **Vision** | `Qwen/Qwen2.5-VL-72B-Instruct` | Reads lab-report images/PDFs and food photos — strong OCR + visual reasoning |
+| 🧠 **Reasoning** | `Qwen/Qwen3-235B-A22B-Instruct-2507` | Turns extracted data into an explanation + plan, and powers the grounded chat |
+
+Splitting **extraction** (vision) from **planning** (reasoning) means each step uses the right tool, the planner stays a clean *text-to-text* task, and either model can be swapped independently at runtime.
+
+### Platform capabilities → how VitalLens uses them
+
+| Token Factory capability | How we use it |
+|--------------------------|---------------|
+| **OpenAI-compatible Chat Completions** (`POST /v1/chat/completions`, Bearer auth) | Single integration point for every AI call — zero vendor lock-in |
+| **Multimodal / vision input** | Report pages & meal photos sent as `image_url` content parts (data URLs) |
+| **JSON mode** (`response_format: { type: "json_object" }`) | Reliable structured output that renders directly into the UI |
+| **System prompts + multi-turn history** | The "Ask about your report" chat stays grounded in *your* results across turns |
+| **Generation params** (`temperature`, `max_tokens`) | Tuned per step — precise extraction vs. warmer chat |
+| **Open model catalog + runtime switching** | Swap models in ⚙️ Settings: `Qwen3-Next-80B-Thinking`, `Llama-3.3-70B-Instruct`, `gpt-oss-120b`, `MiniCPM-V-4_5` |
 
 ### Pipeline
 
@@ -54,6 +67,16 @@ Report image/PDF
 
 Food photo  ──►  (Qwen2.5-VL — vision)  ──►  Nutrition estimate JSON  ──►  UI
 ```
+
+### 🔭 How we scale further on Token Factory (roadmap)
+
+The same platform takes VitalLens from demo to production without changing stacks:
+
+- **Prompt Presets** — develop, version & **share** the planner prompt (it's a clean text-to-text task) with the team, then export to code.
+- **Fine-tuning (LoRA / SFT)** — train a small model (e.g. Qwen3-8B) on synthetic *labs → plan JSON* pairs for cheaper, schema-locked plans; fine-tune a doctor-chat on datasets like ChatDoctor for warmer answers.
+- **Dedicated endpoints** — isolated GPU deployment with **EU data residency (GDPR)** and zero-retention — important for health data.
+- **Built-in observability** — latency / TTFT / token-usage metrics (Prometheus + Grafana) to watch cost and quality.
+- **Embeddings** (`Qwen3-Embedding-8B`) — index a user's past reports to track trends over time.
 
 ---
 
