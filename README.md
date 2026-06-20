@@ -4,6 +4,10 @@
 
 Built for the **Nebius Buildathon**, powered entirely by [**Nebius Token Factory**](https://tokenfactory.nebius.com) — an OpenAI-compatible inference API serving open-source models.
 
+### 🔗 Live demo → **https://vitallens-06201128.web.app**
+
+> First time? Click **⚙️ Settings**, paste your Nebius API token (kept only in your browser), then upload a report.
+
 ---
 
 ## ✨ Features
@@ -92,6 +96,8 @@ firebase deploy
 ```
 
 Config lives in `firebase.json` (serves the `public/` folder) and `.firebaserc`.
+
+Live deployment: **https://vitallens-06201128.web.app**
 
 ---
 
