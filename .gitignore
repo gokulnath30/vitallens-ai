@@ -1,0 +1,13 @@
+# Secrets — never commit real tokens
+.env
+.env.*
+!.env.example
+
+# Firebase
+.firebase/
+*.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+node_modules/

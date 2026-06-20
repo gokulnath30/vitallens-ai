@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VitalLens AI — Medical Report Explainer & Health Planner</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🩺</text></svg>" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.0/marked.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: { 50:'#eef9f6',100:'#d4f0e8',500:'#0fae8e',600:'#0b9579',700:'#0a7a64' },
+            ink: '#0f1f2e'
+          },
+          fontFamily: { sans: ['Inter','system-ui','sans-serif'] }
+        }
+      }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body{font-family:'Inter',system-ui,sans-serif}
+    .glass{backdrop-filter:blur(12px);background:rgba(255,255,255,.7)}
+    .gradient-hero{background:radial-gradient(1200px 500px at 10% -10%,#d4f0e8 0%,transparent 60%),radial-gradient(900px 500px at 100% 0%,#e0f2fe 0%,transparent 55%),#f8fafc}
+    .card{background:#fff;border:1px solid #eef0f3;border-radius:20px;box-shadow:0 1px 2px rgba(16,24,40,.04),0 12px 28px -18px rgba(16,24,40,.18)}
+    .spin{animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
+    .fade-in{animation:fade .5s ease both}@keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+    .prose-mini h1,.prose-mini h2,.prose-mini h3{font-weight:700;color:#0f1f2e;margin:.6em 0 .3em}
+    .prose-mini ul{list-style:disc;padding-left:1.2em;margin:.4em 0}
+    .prose-mini li{margin:.2em 0}
+    .prose-mini p{margin:.4em 0}
+    .drop.drag{border-color:#0fae8e;background:#eef9f6}
+    /* chat typing dots */
+    .tdot{width:7px;height:7px;border-radius:50%;background:#94a3b8;display:inline-block;animation:tbounce 1.2s infinite}
+    .tdot:nth-child(2){animation-delay:.15s}.tdot:nth-child(3){animation-delay:.3s}
+    @keyframes tbounce{0%,60%,100%{transform:translateY(0);opacity:.35}30%{transform:translateY(-5px);opacity:1}}
+    /* marker bar pointer + fill animation */
+    .bar-fill{transition:width .8s cubic-bezier(.22,1,.36,1)}
+    .bar-dot{transition:left .8s cubic-bezier(.22,1,.36,1)}
+    /* slim scrollbar for chat */
+    #chatLog::-webkit-scrollbar{width:6px}
+    #chatLog::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:999px}
+    /* avoid horizontal scroll on small screens */
+    html,body{overflow-x:hidden}
+  </style>
+</head>
+<body class="gradient-hero text-ink min-h-screen">
+
+  <!-- NAV -->
+  <nav class="sticky top-0 z-40 glass border-b border-white/40">
+    <div class="max-w-6xl mx-auto px-5 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-xl bg-brand-500 text-white grid place-items-center text-lg shadow">🩺</div>
+        <div>
+          <div class="font-extrabold tracking-tight leading-none">VitalLens<span class="text-brand-600"> AI</span></div>
+          <div class="text-[11px] text-slate-500 leading-none mt-0.5">Medical Report Explainer & Health Planner</div>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <span id="modelChip" class="hidden sm:inline-flex text-[11px] px-2.5 py-1 rounded-full bg-brand-50 text-brand-700 font-medium border border-brand-100"></span>
+        <button onclick="openSettings()" class="text-sm font-medium text-slate-600 hover:text-ink px-3 py-1.5 rounded-lg hover:bg-slate-100 transition">⚙️ Settings</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <header class="max-w-6xl mx-auto px-5 pt-12 pb-6 text-center">
+    <span class="inline-flex items-center gap-2 text-xs font-semibold text-brand-700 bg-brand-50 border border-brand-100 px-3 py-1 rounded-full">⚡ Powered by Nebius Token Factory · Vision AI</span>
+    <h1 class="mt-4 text-4xl sm:text-5xl font-extrabold tracking-tight leading-tight">Understand your blood test.<br><span class="text-brand-600">Get a plan to feel better.</span></h1>
+    <p class="mt-4 text-slate-600 max-w-2xl mx-auto text-[15px]">Upload your medical report — VitalLens reads it, explains every marker in plain language, and builds a personalized <b>diet</b>, <b>exercise</b> and <b>daily routine</b>. Snap your meals to track nutrition.</p>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-5 pb-24 space-y-8">
+
+    <!-- API KEY BANNER (non-blocking) -->
+    <div id="keyBanner" class="hidden flex items-center justify-between gap-3 flex-wrap bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
+      <span>🔑 Add your Nebius API token to enable AI analysis. You can still upload files now.</span>
+      <button onclick="openSettings()" class="font-semibold bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg transition">Add token</button>
+    </div>
+
+    <!-- STEP 1: UPLOAD REPORT -->
+    <section class="card p-6 sm:p-8 fade-in">
+      <div class="flex items-center gap-3 mb-5">
+        <span class="w-7 h-7 rounded-full bg-brand-500 text-white grid place-items-center text-sm font-bold">1</span>
+        <h2 class="text-xl font-bold">Upload your medical report</h2>
+      </div>
+      <div id="reportDrop" class="drop border-2 border-dashed border-slate-300 rounded-2xl p-8 text-center transition cursor-pointer hover:bg-slate-50">
+        <input id="reportInput" type="file" accept="application/pdf,image/*" class="hidden" />
+        <div class="text-4xl mb-2">📄</div>
+        <p class="font-semibold">Drop your report here or <span class="text-brand-600">browse</span></p>
+        <p class="text-xs text-slate-500 mt-1">PDF or image (JPG/PNG) · Blood test, lab panel, health checkup</p>
+      </div>
+      <div id="reportPreview" class="hidden mt-4 flex flex-col sm:flex-row sm:items-center gap-4">
+        <div class="flex items-center gap-4 flex-1 min-w-0">
+          <img id="reportThumb" class="w-16 h-20 sm:w-20 sm:h-24 object-cover rounded-lg border shrink-0" />
+          <div class="min-w-0">
+            <div id="reportName" class="font-medium text-sm truncate"></div>
+            <div id="reportMeta" class="text-xs text-slate-500"></div>
+          </div>
+        </div>
+        <button id="analyzeBtn" onclick="analyzeReport()" class="w-full sm:w-auto bg-brand-500 hover:bg-brand-600 text-white font-semibold px-5 py-3 sm:py-2.5 rounded-xl shadow transition flex items-center justify-center gap-2">
+          <span id="analyzeSpin" class="hidden w-4 h-4 border-2 border-white/40 border-t-white rounded-full spin"></span>
+          <span id="analyzeLabel">🔍 Analyze report</span>
+        </button>
+      </div>
+      <div id="reportError" class="hidden mt-3 text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2"></div>
+    </section>
+
+    <!-- RESULTS -->
+    <section id="results" class="hidden space-y-8">
+
+      <!-- Summary -->
+      <div class="card p-6 sm:p-8 fade-in">
+        <div class="flex items-center gap-3 mb-4">
+          <span class="w-7 h-7 rounded-full bg-brand-500 text-white grid place-items-center text-sm font-bold">2</span>
+          <h2 class="text-xl font-bold">What your report says</h2>
+        </div>
+
+        <!-- Overall health meter (visual, for everyone) -->
+        <div id="healthMeter" class="hidden mb-6"></div>
+
+        <div id="summaryBox" class="prose-mini text-[15px] text-slate-700 leading-relaxed"></div>
+
+        <div id="concernsBox" class="hidden mt-5"></div>
+
+        <!-- Visual marker cards: arrow + Low–Normal–High bar -->
+        <h3 class="font-bold mt-7 mb-3 text-sm uppercase tracking-wide text-slate-500">Your results at a glance</h3>
+        <div id="findingsVisual" class="grid sm:grid-cols-2 gap-3 mb-7"></div>
+
+        <details class="group">
+          <summary class="cursor-pointer text-sm font-semibold text-slate-500 hover:text-ink select-none">📋 Show detailed values</summary>
+          <div class="overflow-x-auto mt-3">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-left text-slate-500 border-b border-slate-200">
+                <th class="py-2 pr-4 font-semibold">Marker</th>
+                <th class="py-2 pr-4 font-semibold">Your value</th>
+                <th class="py-2 pr-4 font-semibold">Status</th>
+                <th class="py-2 font-semibold">What it means</th>
+              </tr>
+            </thead>
+            <tbody id="findingsBody"></tbody>
+          </table>
+          </div>
+        </details>
+      </div>
+
+      <!-- Plan -->
+      <div class="card p-6 sm:p-8 fade-in">
+        <div class="flex items-center gap-3 mb-5">
+          <span class="w-7 h-7 rounded-full bg-brand-500 text-white grid place-items-center text-sm font-bold">3</span>
+          <h2 class="text-xl font-bold">Your personalized plan</h2>
+        </div>
+        <div class="flex flex-wrap gap-2 mb-6" id="planTabs">
+          <button data-tab="diet" class="tab-btn bg-brand-500 text-white px-4 py-2 rounded-lg text-sm font-semibold">🥗 Diet</button>
+          <button data-tab="exercise" class="tab-btn bg-slate-100 text-slate-600 px-4 py-2 rounded-lg text-sm font-semibold">🏃 Exercise</button>
+          <button data-tab="routine" class="tab-btn bg-slate-100 text-slate-600 px-4 py-2 rounded-lg text-sm font-semibold">🌅 Daily routine</button>
+        </div>
+        <div id="tab-diet" class="tab-panel"></div>
+        <div id="tab-exercise" class="tab-panel hidden"></div>
+        <div id="tab-routine" class="tab-panel hidden"></div>
+        <div class="mt-6 pt-5 border-t border-slate-100 flex items-center justify-between flex-wrap gap-3">
+          <p class="text-xs text-slate-500">🔔 Turn on reminders to get nudged through your daily routine.</p>
+          <button onclick="enableReminders()" id="remindBtn" class="text-sm font-semibold text-brand-700 bg-brand-50 border border-brand-100 px-4 py-2 rounded-lg hover:bg-brand-100 transition">Enable daily reminders</button>
+        </div>
+      </div>
+
+      <!-- Ask about your report -->
+      <div class="card p-6 sm:p-8 fade-in">
+        <div class="flex items-center gap-3 mb-1">
+          <span class="w-7 h-7 rounded-full bg-brand-500 text-white grid place-items-center text-sm font-bold">💬</span>
+          <h2 class="text-xl font-bold">Ask about your report</h2>
+        </div>
+        <p class="text-sm text-slate-500 mb-4">Have a question? Ask in plain words — answers are based on <b>your</b> results.</p>
+
+        <div class="rounded-2xl bg-slate-50 border border-slate-100 p-3 sm:p-4">
+          <div id="chatLog" class="space-y-3 mb-3 max-h-[55vh] sm:max-h-96 overflow-y-auto pr-1">
+            <div id="chatEmpty" class="flex flex-col items-center text-center py-8 text-slate-400">
+              <div class="w-12 h-12 rounded-full bg-brand-50 grid place-items-center text-2xl mb-2">🩺</div>
+              <p class="text-sm font-medium text-slate-500">Ask me anything about your results</p>
+              <p class="text-xs mt-0.5">Tap a question below or type your own</p>
+            </div>
+          </div>
+
+          <div id="chatSuggest" class="flex flex-wrap gap-2 mb-3">
+            <button class="chip text-xs bg-white text-brand-700 border border-brand-100 px-3 py-2 rounded-full hover:bg-brand-50 active:scale-95 transition">Why is this important?</button>
+            <button class="chip text-xs bg-white text-brand-700 border border-brand-100 px-3 py-2 rounded-full hover:bg-brand-50 active:scale-95 transition">What foods should I eat?</button>
+            <button class="chip text-xs bg-white text-brand-700 border border-brand-100 px-3 py-2 rounded-full hover:bg-brand-50 active:scale-95 transition">Is this serious?</button>
+          </div>
+
+          <form id="chatForm" class="flex gap-2 items-center">
+            <input id="chatInput" type="text" autocomplete="off" enterkeyhint="send" placeholder="Type your question…" class="flex-1 min-w-0 bg-white border border-slate-300 rounded-full px-4 py-3 text-sm focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-100" />
+            <button type="submit" id="chatSend" aria-label="Send" class="shrink-0 w-12 h-12 grid place-items-center bg-brand-500 hover:bg-brand-600 active:scale-95 text-white rounded-full shadow transition text-lg">➤</button>
+          </form>
+        </div>
+        <p class="text-[11px] text-slate-400 mt-2">⚕️ Educational guidance only — not a diagnosis. For medical decisions, consult a doctor.</p>
+      </div>
+    </section>
+
+    <!-- STEP 4: FOOD -->
+    <section class="card p-6 sm:p-8 fade-in">
+      <div class="flex items-center gap-3 mb-2">
+        <span class="w-7 h-7 rounded-full bg-brand-500 text-white grid place-items-center text-sm font-bold">4</span>
+        <h2 class="text-xl font-bold">Track your meals</h2>
+      </div>
+      <p class="text-sm text-slate-500 mb-5">Snap a photo of what you eat. VitalLens estimates the nutrition and tells you if it fits your plan.</p>
+      <div class="grid md:grid-cols-2 gap-6">
+        <div>
+          <div id="foodDrop" class="drop border-2 border-dashed border-slate-300 rounded-2xl p-8 text-center transition cursor-pointer hover:bg-slate-50">
+            <input id="foodInput" type="file" accept="image/*" class="hidden" />
+            <div class="text-4xl mb-2">🍽️</div>
+            <p class="font-semibold">Add a food photo</p>
+            <p class="text-xs text-slate-500 mt-1">JPG / PNG</p>
+          </div>
+          <img id="foodThumb" class="hidden mt-4 w-full max-h-56 object-cover rounded-xl border" />
+          <button id="foodBtn" onclick="analyzeFood()" class="hidden mt-4 w-full bg-brand-500 hover:bg-brand-600 text-white font-semibold px-5 py-2.5 rounded-xl shadow transition items-center justify-center gap-2">
+            <span id="foodSpin" class="hidden w-4 h-4 border-2 border-white/40 border-t-white rounded-full spin"></span>
+            <span id="foodLabel">🔬 Analyze meal</span>
+          </button>
+        </div>
+        <div id="foodResult" class="hidden"></div>
+        <div id="foodPlaceholder" class="grid place-items-center text-center text-slate-400 text-sm border border-dashed border-slate-200 rounded-2xl p-8">
+          Nutrition breakdown will appear here.
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="text-center text-xs text-slate-400 pb-10">
+    VitalLens AI · Educational use only — not a substitute for professional medical advice.
+  </footer>
+
+  <!-- SETTINGS MODAL -->
+  <div id="settingsModal" class="hidden fixed inset-0 z-50 grid place-items-center p-4 bg-black/40">
+    <div class="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="font-bold text-lg">Settings</h3>
+        <button onclick="closeSettings()" class="text-slate-400 hover:text-ink text-xl">✕</button>
+      </div>
+      <label class="block text-sm font-semibold mb-1">Nebius API token</label>
+      <input id="apiKeyInput" type="password" placeholder="v1...." class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm mb-1" />
+      <p class="text-xs text-slate-400 mb-4">Stored only in your browser (localStorage).</p>
+      <label class="block text-sm font-semibold mb-1">Vision model <span class="font-normal text-slate-400">· reads the report & food images</span></label>
+      <select id="modelInput" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm mb-4">
+        <option value="Qwen/Qwen2.5-VL-72B-Instruct">Qwen2.5-VL-72B-Instruct (vision)</option>
+        <option value="nvidia/Cosmos3-Super-Reasoner">Cosmos3-Super-Reasoner (vision)</option>
+        <option value="openbmb/MiniCPM-V-4_5">MiniCPM-V-4_5 (vision)</option>
+      </select>
+      <label class="block text-sm font-semibold mb-1">Reasoning model <span class="font-normal text-slate-400">· writes the health plan</span></label>
+      <select id="textModelInput" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm mb-4">
+        <option value="Qwen/Qwen3-235B-A22B-Instruct-2507">Qwen3-235B-A22B-Instruct</option>
+        <option value="Qwen/Qwen3-Next-80B-A3B-Thinking">Qwen3-Next-80B-Thinking</option>
+        <option value="meta-llama/Llama-3.3-70B-Instruct">Llama-3.3-70B-Instruct</option>
+        <option value="openai/gpt-oss-120b">gpt-oss-120b</option>
+      </select>
+      <label class="block text-sm font-semibold mb-1">Base URL</label>
+      <input id="baseUrlInput" type="text" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm mb-5" />
+      <button onclick="saveSettings()" class="w-full bg-brand-500 hover:bg-brand-600 text-white font-semibold py-2.5 rounded-xl">Save</button>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
