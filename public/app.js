@@ -243,18 +243,27 @@ function renderResults(d){
   if(typeof d.health_score !== 'undefined' && d.health_score !== null){
     const sv = scoreVisual(d.health_score);
     const score = Math.max(0, Math.min(100, parseInt(d.health_score)));
+    // status breakdown chips
+    const counts = {};
+    (d.findings||[]).forEach(f=>{ const s=(f.status||'normal').toLowerCase(); counts[s]=(counts[s]||0)+1; });
+    const order=[['normal','✅','Good','#0b9579'],['borderline','⚠️','Borderline','#ea580c'],['low','🔻','Low','#d97706'],['high','🔺','High','#dc2626']];
+    const chips = order.filter(o=>counts[o[0]]).map(o=>`<span class="text-xs font-semibold px-2.5 py-1 rounded-full" style="background:${o[3]}1a;color:${o[3]}">${o[1]} ${counts[o[0]]} ${o[2]}</span>`).join('');
     hm.classList.remove('hidden');
-    hm.innerHTML = `<div class="bg-slate-50 border border-slate-100 rounded-2xl p-5 flex items-center gap-4 sm:gap-5">
-      <div class="text-5xl sm:text-6xl leading-none">${sv.face}</div>
-      <div class="flex-1">
-        <div class="flex items-baseline justify-between mb-1.5 flex-wrap gap-1">
-          <span class="font-bold">Your overall health</span>
-          <span class="text-sm font-bold" style="color:${sv.color}">${esc(d.health_label||sv.label)} · ${score}/100</span>
+    hm.innerHTML = `<div class="bg-slate-50 border border-slate-100 rounded-2xl p-4 sm:p-5">
+      <div class="flex items-center gap-4 sm:gap-5">
+        <div class="text-5xl sm:text-6xl leading-none">${sv.face}</div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-baseline justify-between mb-1.5 flex-wrap gap-x-2 gap-y-0.5">
+            <span class="font-bold">Your overall health</span>
+            <span class="text-sm font-bold" style="color:${sv.color}">${esc(d.health_label||sv.label)} · ${score}/100</span>
+          </div>
+          <div class="h-3.5 rounded-full bg-slate-200 overflow-hidden">
+            <div class="h-full rounded-full bar-fill" data-w="${score}" style="width:0;background:${sv.color}"></div>
+          </div>
         </div>
-        <div class="h-3.5 rounded-full bg-slate-200 overflow-hidden">
-          <div class="h-full rounded-full transition-all" style="width:${score}%;background:${sv.color}"></div>
-        </div>
-      </div></div>`;
+      </div>
+      ${chips?`<div class="flex flex-wrap gap-2 mt-4">${chips}</div>`:''}
+    </div>`;
   } else hm.classList.add('hidden');
 
   // Visual marker cards (arrow + Low–Normal–High bar with a pointer)
@@ -262,20 +271,26 @@ function renderResults(d){
     const st = (f.status||'normal').toLowerCase();
     const v = STATUS_VISUAL[st] || STATUS_VISUAL.normal;
     let pos = (typeof f.position === 'number') ? f.position : (parseInt(f.position) || v.pos);
-    pos = Math.max(3, Math.min(97, pos));
-    return `<div class="border border-slate-200 rounded-xl p-4">
+    pos = Math.max(4, Math.min(96, pos));
+    return `<div class="border border-slate-200 rounded-2xl p-4 bg-white hover:shadow-md transition">
       <div class="flex items-center justify-between mb-1 gap-2">
-        <span class="font-semibold text-sm">${esc(f.marker||'')}</span>
-        <span class="text-xs font-bold px-2 py-0.5 rounded-full" style="background:${v.color}1a;color:${v.color}">${v.arrow} ${v.word}</span>
+        <span class="font-semibold text-sm truncate">${esc(f.marker||'')}</span>
+        <span class="shrink-0 text-xs font-bold px-2.5 py-1 rounded-full" style="background:${v.color}1a;color:${v.color}">${v.arrow} ${v.word}</span>
       </div>
-      <div class="text-lg font-extrabold mb-2.5" style="color:${v.color}">${esc(f.value||'')}</div>
-      <div class="relative h-2.5 rounded-full mb-1" style="background:linear-gradient(90deg,#fcd34d 0 33%,#6ee7b7 33% 67%,#fca5a5 67% 100%)">
-        <div class="absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-white border-2 shadow" style="left:calc(${pos}% - 7px);border-color:${v.color}"></div>
+      <div class="text-xl font-extrabold mb-3" style="color:${v.color}">${esc(f.value||'')}</div>
+      <div class="relative h-2.5 rounded-full" style="background:linear-gradient(90deg,#fcd34d 0 33%,#6ee7b7 33% 67%,#fca5a5 67% 100%)">
+        <div class="bar-dot absolute -top-1 w-4 h-4 rounded-full bg-white border-2 shadow" style="left:0;border-color:${v.color}" data-left="${pos}"></div>
       </div>
-      <div class="flex justify-between text-[10px] font-medium text-slate-400 mb-2"><span>Low</span><span>Normal</span><span>High</span></div>
+      <div class="flex justify-between text-[10px] font-medium text-slate-400 mt-1.5 mb-2"><span>Low</span><span>Normal</span><span>High</span></div>
       <div class="text-xs text-slate-600 leading-snug">${esc(f.meaning||'')}</div>
     </div>`;
-  }).join('') || `<div class="text-slate-400 text-sm">No individual markers extracted.</div>`;
+  }).join('') || `<div class="text-slate-400 text-sm col-span-full">No individual markers extracted.</div>`;
+
+  // animate bars/pointers after paint
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    document.querySelectorAll('#healthMeter [data-w]').forEach(el => { el.style.width = el.dataset.w + '%'; });
+    document.querySelectorAll('#findingsVisual [data-left]').forEach(el => { el.style.left = `calc(${el.dataset.left}% - 8px)`; });
+  }));
 
   document.getElementById('summaryBox').innerHTML = marked.parse(d.summary || '');
 
@@ -425,8 +440,9 @@ async function sendChat(text){
   document.getElementById('chatSuggest').classList.add('hidden');
   chatBubble('user', esc(text));
   document.getElementById('chatInput').value = '';
-  const typing = chatBubble('bot', '<span class="inline-flex gap-1"><span class="w-1.5 h-1.5 bg-slate-400 rounded-full spin"></span> thinking…</span>');
-  document.getElementById('chatSend').disabled = true;
+  const typing = chatBubble('bot', TYPING_HTML);
+  const sendBtn = document.getElementById('chatSend');
+  sendBtn.disabled = true; sendBtn.classList.add('opacity-50');
   try {
     const ctx = reportCtx ? {
       summary: reportCtx.plan?.summary,
@@ -445,7 +461,7 @@ async function sendChat(text){
   } catch(err){
     typing.innerHTML = `<span class="text-red-600">${esc(err.message)}</span>`;
   } finally {
-    document.getElementById('chatSend').disabled = false;
+    sendBtn.disabled = false; sendBtn.classList.remove('opacity-50');
     document.getElementById('chatLog').scrollTop = document.getElementById('chatLog').scrollHeight;
   }
 }
